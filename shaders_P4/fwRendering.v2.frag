@@ -56,7 +56,7 @@ vec3 shade()
 	vec3 specular = Is*Ks*pow(factor,alpha);
 	c += clamp(specular, 0.0, 1.0);
 
-	c+=Ke;
+	c += Ke;
 	
 	return c;
 }

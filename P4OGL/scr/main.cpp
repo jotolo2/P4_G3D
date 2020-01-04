@@ -10,6 +10,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
 #include <iostream>
 #include <cstdlib>
 
@@ -24,6 +25,9 @@
 glm::mat4	proj = glm::mat4(1.0f);
 glm::mat4	view = glm::mat4(1.0f);
 glm::mat4	model = glm::mat4(1.0f);
+
+float focalDistance;
+float maxDistanceFactor;
 
 
 //////////////////////////////////////////////////////////////
@@ -60,6 +64,10 @@ unsigned int program;
 int uModelViewMat;
 int uModelViewProjMat;
 int uNormalMat;
+int uFocalDistance;
+int uMaxDistanceFactor;
+int uNear;
+int uFar;
 
 //Texturas Uniform
 int uColorTex;
@@ -83,6 +91,10 @@ int inPosPP;
 
 unsigned int uVertexTexPP;
 unsigned int vertexBuffTexId;
+
+//Control de parámetros
+float motionAlpha, motionColor;
+float projNear, projFar;
 
 
 //////////////////////////////////////////////////////////////
@@ -193,9 +205,17 @@ void initOGL()
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glEnable(GL_CULL_FACE);
 
-	proj = glm::perspective(glm::radians(60.0f), 1.0f, 1.0f, 50.0f);
+	projNear = 1.0f;
+	projFar = 50.0f;
+
+	proj = glm::perspective(glm::radians(60.0f), 1.0f, projNear, projFar);
 	view = glm::mat4(1.0f);
 	view[3].z = -25.0f;
+
+	motionAlpha = 0.6;
+	motionColor = 0.5;
+	focalDistance = -25.0;
+	maxDistanceFactor =5;
 }
 
 
@@ -279,8 +299,6 @@ void initShaderFw(const char *vname, const char *fname)
 	inColor = glGetAttribLocation(program, "inColor");
 	inNormal = glGetAttribLocation(program, "inNormal");
 	inTexCoord = glGetAttribLocation(program, "inTexCoord");
-
-	
 }
 
 void initShaderPP(const char* vname, const char* fname)
@@ -310,15 +328,24 @@ void initShaderPP(const char* vname, const char* fname)
 		postProccesProgram = 0;
 		exit(-1);
 	}
-	uColorTexPP = glGetUniformLocation(postProccesProgram, "colorTex");
+
 	inPosPP = glGetAttribLocation(postProccesProgram, "inPos");
 	
 	glUseProgram(postProccesProgram);
+
+	uColorTexPP = glGetUniformLocation(postProccesProgram, "colorTex");
 	if (uColorTexPP != -1)
 		glUniform1i(uColorTexPP, 0);
 
 	uVertexTexPP = glGetUniformLocation(postProccesProgram, "vertexTex");
-	if (uVertexTexPP != -1) glUniform1i(uVertexTexPP, 1);
+	if (uVertexTexPP != -1)
+		glUniform1i(uVertexTexPP, 1);
+
+	uFocalDistance = glGetUniformLocation(postProccesProgram, "focalDistance");
+	uMaxDistanceFactor = glGetUniformLocation(postProccesProgram, "maxDistanceFactor");
+	uNear = glGetUniformLocation(postProccesProgram, "near");
+	uFar = glGetUniformLocation(postProccesProgram, "far");
+
 }
 
 void initObj()
@@ -452,8 +479,7 @@ unsigned int loadTex(const char *fileName)
 	delete[] map;
 	glGenerateMipmap(GL_TEXTURE_2D);
 
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-		GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
@@ -517,15 +543,36 @@ void renderFunc()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	
 	glUseProgram(postProccesProgram);
+
+	if (uFocalDistance != -1)
+	{
+		glUniform1f(uFocalDistance, focalDistance);
+	}
+
+	if (uMaxDistanceFactor != -1)
+	{
+		glUniform1f(uMaxDistanceFactor, 1/maxDistanceFactor);
+	}
+
+	if (uNear != -1)
+	{
+		glUniform1f(uNear, projNear);
+	}
+
+	if (uFar != -1)
+	{
+		glUniform1f(uFar, projFar);
+	}
+
+
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
 
-	//glEnable(GL_BLEND);
+	glEnable(GL_BLEND);
 	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	//glBlendFunc(GL_CONSTANT_COLOR, GL_CONSTANT_ALPHA);
-	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	//glBlendColor(0.5f, 0.5f, 0.5f, 0.6f);
-	//glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_CONSTANT_COLOR, GL_CONSTANT_ALPHA);
+	glBlendColor(motionColor, motionColor, motionColor, motionAlpha);
+	glBlendEquation(GL_FUNC_ADD);
 
 
 	glActiveTexture(GL_TEXTURE0);
@@ -562,8 +609,7 @@ void renderCube()
 		&(normal[0][0]));
 	
 	glBindVertexArray(vao);
-	glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3,
-		GL_UNSIGNED_INT, (void*)0);
+	glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
 }
 
 
@@ -571,7 +617,7 @@ void renderCube()
 void resizeFunc(int width, int height)
 {
 	glViewport(0, 0, width, height);
-	proj = glm::perspective(glm::radians(60.0f), float(width) /float(height), 1.0f, 50.0f);
+	proj = glm::perspective(glm::radians(60.0f), float(width) /float(height), projNear, projFar);
 
 	resizeFBO(width, height);
 
@@ -585,7 +631,36 @@ void idleFunc()
 	glutPostRedisplay();
 }
 
-void keyboardFunc(unsigned char key, int x, int y){}
+void keyboardFunc(unsigned char key, int x, int y)
+{
+	switch (key)
+	{
+	case('1'):
+		motionAlpha = std::min(1.0f, motionAlpha + 0.01f);
+		break;
+	case('2'):
+		motionAlpha = std::max(0.0f, motionAlpha - 0.01f);
+		break;
+	case('3'):
+		motionColor = std::min(1.0f, motionColor + 0.01f);
+		break;
+	case('4'):
+		motionColor = std::max(0.0f, motionColor - 0.01f);
+		break;
+	case('5'):
+		focalDistance = std::max(-100.0f, focalDistance - 0.25f);
+		break;	
+	case('6'):
+		focalDistance = std::min(0.0f, focalDistance + 0.25f);
+		break;
+	case('7'):
+		maxDistanceFactor = std::min(100.0f, maxDistanceFactor + 0.1f);
+		break;	
+	case('8'):
+		maxDistanceFactor = std::max(0.1f, maxDistanceFactor - 0.1f);
+		break;
+	}
+}
 void mouseFunc(int button, int state, int x, int y){}
 
 
@@ -603,34 +678,28 @@ void initFBO()
 void resizeFBO(unsigned int w, unsigned int h)
 {
 	glBindTexture(GL_TEXTURE_2D, colorBuffTexId);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0,
-		GL_RGBA, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	
 	glBindTexture(GL_TEXTURE_2D, depthBuffTexId);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0,
-		GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	glBindTexture(GL_TEXTURE_2D, vertexBuffTexId);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, w, h, 0,
-		GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-		GL_TEXTURE_2D, colorBuffTexId, 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
-		depthBuffTexId, 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1,
-		GL_TEXTURE_2D, vertexBuffTexId, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffTexId, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthBuffTexId, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, vertexBuffTexId, 0);
 
 	const GLenum buffs[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 	glDrawBuffers(2, buffs);
