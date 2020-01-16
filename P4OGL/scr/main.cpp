@@ -1,6 +1,7 @@
 ﻿#include "BOX.h"
 #include "auxiliar.h"
 #include "PLANE.h"
+#include "convolutionMasks.h"
 
 #include <gl/glew.h>
 #define SOLVE_FGLUT_WARNING
@@ -10,6 +11,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <string>
 #include <algorithm>
 #include <iostream>
 #include <cstdlib>
@@ -29,6 +31,9 @@ glm::mat4	model = glm::mat4(1.0f);
 float focalDistance;
 float maxDistanceFactor;
 
+
+int maskSelector;
+float mask_9d[9];
 
 //////////////////////////////////////////////////////////////
 // Variables que nos dan acceso a Objetos OpenGL
@@ -68,6 +73,13 @@ int uFocalDistance;
 int uMaxDistanceFactor;
 int uNear;
 int uFar;
+
+int uMaskSize;
+int uTexIdx9;
+int uTexIdx25;
+int uMask9;
+int uMask25;
+int uMaskSelector;
 
 //Texturas Uniform
 int uColorTex;
@@ -149,7 +161,7 @@ int main(int argc, char** argv)
 	initContext(argc, argv);
 	initOGL();
 	initShaderFw("../shaders_P4/fwRendering.v1.vert", "../shaders_P4/fwRendering.v2.frag");
-	initShaderPP("../shaders_P4/postProcessing.v1.vert", "../shaders_P4/postProcessing.v2.frag");
+	initShaderPP("../shaders_P4/postProcessing.v1.vert", "../shaders_P4/postProcessing.v4.frag");
 
 	initObj();
 	initPlane();
@@ -215,7 +227,11 @@ void initOGL()
 	motionAlpha = 0.6;
 	motionColor = 0.5;
 	focalDistance = -25.0;
-	maxDistanceFactor =5;
+	maxDistanceFactor = 5;
+	maskSelector = 0;
+
+	for (int i = 0; i < maskSize9; ++i)
+		mask_9d[i] = mask1[i];
 }
 
 
@@ -346,6 +362,12 @@ void initShaderPP(const char* vname, const char* fname)
 	uNear = glGetUniformLocation(postProccesProgram, "near");
 	uFar = glGetUniformLocation(postProccesProgram, "far");
 
+	uMask9 = glGetUniformLocation(postProccesProgram, "mask9");
+	uTexIdx9 = glGetUniformLocation(postProccesProgram, "texIdx9");
+	uMask25 = glGetUniformLocation(postProccesProgram, "mask25");
+	uTexIdx25 = glGetUniformLocation(postProccesProgram, "texIdx25");
+	uMaskSize = glGetUniformLocation(postProccesProgram, "maskSize");
+	uMaskSelector = glGetUniformLocation(postProccesProgram, "maskSelector");
 }
 
 void initObj()
@@ -538,7 +560,6 @@ void renderFunc()
 		model = glm::scale(model, glm::vec3(1.0f / (size*0.7f)));
 		renderCube();
 	}
-	//*/
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	
@@ -564,15 +585,58 @@ void renderFunc()
 		glUniform1f(uFar, projFar);
 	}
 
+	if (uMaskSize != -1)
+	{
+		if(maskSelector < 4)
+			glUniform1i(uMaskSize, maskSize9);
+		else
+			glUniform1i(uMaskSize, maskSize25);
+	}
+
+	if (uMaskSelector != 1)
+	{
+		glUniform1i(uMaskSelector, maskSelector);
+	}
+
+	if (uMask9 != -1)
+	{
+		glUniform1fv(uMask9, maskSize9, mask_9d);
+	}
+
+	if (uTexIdx9 != -1)
+	{
+		for (int i = 0; i != maskSize9; ++i) 
+		{
+			GLint originsLoc = glGetUniformLocation(postProccesProgram, ("texIdx9[" + std::to_string(i) + "]").c_str());
+			glUniform2f(originsLoc, texIdx9[i].x, texIdx9[i].y);
+		}
+	}
+
+	if (uMask25 != -1)
+	{
+		glUniform1fv(uMask25, maskSize25, mask25);
+	}
+
+	if (uTexIdx25 != -1)
+	{
+		for (int i = 0; i != maskSize25; ++i)
+		{
+			GLint originsLoc = glGetUniformLocation(postProccesProgram, ("texIdx25[" + std::to_string(i) + "]").c_str());
+			glUniform2f(originsLoc, texIdx25[i].x, texIdx25[i].y);
+		}
+	}
+
+
+
 
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
 
-	glEnable(GL_BLEND);
+	//glEnable(GL_BLEND);
 	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glBlendFunc(GL_CONSTANT_COLOR, GL_CONSTANT_ALPHA);
-	glBlendColor(motionColor, motionColor, motionColor, motionAlpha);
-	glBlendEquation(GL_FUNC_ADD);
+	//glBlendFunc(GL_CONSTANT_COLOR, GL_CONSTANT_ALPHA);
+	//glBlendColor(motionColor, motionColor, motionColor, motionAlpha);
+	//glBlendEquation(GL_FUNC_ADD);
 
 
 	glActiveTexture(GL_TEXTURE0);
@@ -658,6 +722,28 @@ void keyboardFunc(unsigned char key, int x, int y)
 		break;	
 	case('8'):
 		maxDistanceFactor = std::max(0.1f, maxDistanceFactor - 0.1f);
+		break;
+	case('9'):
+		maskSelector = (maskSelector < 4) ? maskSelector + 1 : 0;
+		switch (maskSelector)
+		{
+		case(0):
+			for (int i = 0; i < maskSize9; ++i)
+				mask_9d[i] = mask1[i];
+			break;
+		case(1):
+			for (int i = 0; i < maskSize9; ++i)
+				mask_9d[i] = laplacianEdgeFilterMask[i];
+			break;
+		case(2):
+			for (int i = 0; i < maskSize9; ++i)
+				mask_9d[i] = northDirectionMask[i]; 
+			break;
+		case(3):
+			for (int i = 0; i < maskSize9; ++i)
+				mask_9d[i] = embossFilterMask[i];
+			break;
+		}
 		break;
 	}
 }

@@ -5,6 +5,7 @@ in vec3 inPos;
 //Variables Variantes
 out vec2 texCoord;
 
+
 void main()
 {
 	texCoord = inPos.xy*0.5 + vec2(0.5);

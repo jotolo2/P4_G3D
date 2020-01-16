@@ -50,6 +50,7 @@ const float horizontalFilterMask[MASK_LITTLE_SIZE]= float[](
 	-1.0,   -2.0 ,   -1.0,
 	 0.0,  0.0 ,   0.0 ,
 	 1.0,   2.0 ,  1.0);
+
 const float verticalFilterMask[MASK_LITTLE_SIZE]= float[](
 	-1.0,   0.0 ,  1.0,
 	 -2.0,  0.0 ,  2.0 ,
