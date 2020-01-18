@@ -40,6 +40,7 @@ void main()
 	//Sería más rápido utilizar una variable uniform el tamaño de la textura.
 	vec2 ts = vec2(1.0) / vec2 (textureSize (colorTex, 0));
 
+	//Ojo al texture(depthTex, texCoord).x El buffer de profundidad 
 	float vz = -(near * far) / (far + texture(depthTex, texCoord).x * (near - far)) ;
 	float dof = abs(vz - focalDistance) * maxDistanceFactor;
 
