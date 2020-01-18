@@ -40,8 +40,7 @@ float mask_9d[9];
 float angle = 0.0f;
 
 unsigned int fbo;
-unsigned int colorBuffTexId;
-unsigned int depthBuffTexId;
+
 
 //VAO
 unsigned int vao;
@@ -99,11 +98,17 @@ unsigned int postProccesProgram;
 
 //Uniform
 unsigned int uColorTexPP;
+unsigned int uVertexTexPP;
+unsigned int uNormalTexPP;
+
+unsigned int colorBuffTexId;
+unsigned int depthBuffTexId;
+unsigned int vertexBuffTexId;
+unsigned int normalBuffTexId;
+
 //Atributos
 int inPosPP;
 
-unsigned int uVertexTexPP;
-unsigned int vertexBuffTexId;
 
 //Control de parámetros
 float motionAlpha, motionColor;
@@ -262,6 +267,7 @@ void destroy()
 	glDeleteFramebuffers(1, &fbo);
 	glDeleteTextures(1, &colorBuffTexId);
 	glDeleteTextures(1, &depthBuffTexId);
+	glDeleteTextures(1, &vertexBuffTexId);
 }
 
 void initShaderFw(const char* vname, const char* fname)
@@ -350,6 +356,10 @@ void initShaderPP(const char* vname, const char* fname)
 	uVertexTexPP = glGetUniformLocation(postProccesProgram, "vertexTex");
 	if (uVertexTexPP != -1)
 		glUniform1i(uVertexTexPP, 1);
+
+	uNormalTexPP = glGetUniformLocation(postProccesProgram, "normalTex");
+	if (uNormalTexPP != -1)
+		glUniform1i(uNormalTexPP, 2);
 
 	uFocalDistance = glGetUniformLocation(postProccesProgram, "focalDistance");
 	uMaxDistanceFactor = glGetUniformLocation(postProccesProgram, "maxDistanceFactor");
@@ -637,6 +647,10 @@ void renderFunc()
 	glActiveTexture(GL_TEXTURE0 + 1);
 	glBindTexture(GL_TEXTURE_2D, vertexBuffTexId);
 
+	glActiveTexture(GL_TEXTURE0 + 2);
+	glBindTexture(GL_TEXTURE_2D, normalBuffTexId);
+
+
 	glBindVertexArray(planeVAO);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
@@ -744,6 +758,7 @@ void initFBO()
 	glGenTextures(1, &colorBuffTexId);
 	glGenTextures(1, &depthBuffTexId);
 	glGenTextures(1, &vertexBuffTexId);
+	glGenTextures(1, &normalBuffTexId);
 
 	resizeFBO(SCREEN_SIZE);
 }
@@ -767,13 +782,21 @@ void resizeFBO(unsigned int w, unsigned int h)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
+	glBindTexture(GL_TEXTURE_2D, normalBuffTexId);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+
+
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffTexId, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthBuffTexId, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, vertexBuffTexId, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, normalBuffTexId, 0);
 
-	const GLenum buffs[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-	glDrawBuffers(2, buffs);
+	const GLenum buffs[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+	glDrawBuffers(3, buffs);
 
 	if (GL_FRAMEBUFFER_COMPLETE != glCheckFramebufferStatus(GL_FRAMEBUFFER))
 	{
