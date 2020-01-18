@@ -5,7 +5,7 @@
 
 #include <gl/glew.h>
 #define SOLVE_FGLUT_WARNING
-#include <gl/freeglut.h> 
+#include <gl/freeglut.h>
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
@@ -30,7 +30,6 @@ glm::mat4	model = glm::mat4(1.0f);
 
 float focalDistance;
 float maxDistanceFactor;
-
 
 int maskSelector;
 float mask_9d[9];
@@ -65,7 +64,7 @@ unsigned int vshader;
 unsigned int fshader;
 unsigned int program;
 
-//Variables Uniform 
+//Variables Uniform
 int uModelViewMat;
 int uModelViewProjMat;
 int uNormalMat;
@@ -80,6 +79,8 @@ int uTexIdx25;
 int uMask9;
 int uMask25;
 int uMaskSelector;
+
+int uTime;
 
 //Texturas Uniform
 int uColorTex;
@@ -108,7 +109,6 @@ unsigned int vertexBuffTexId;
 float motionAlpha, motionColor;
 float projNear, projFar;
 
-
 //////////////////////////////////////////////////////////////
 // Funciones auxiliares
 //////////////////////////////////////////////////////////////
@@ -125,7 +125,7 @@ void renderCube();
 //Funciones de inicialización y destrucción
 void initContext(int argc, char** argv);
 void initOGL();
-void initShaderFw(const char *vname, const char *fname);
+void initShaderFw(const char* vname, const char* fname);
 void initShaderPP(const char* vname, const char* fname);
 void initObj();
 void initPlane();
@@ -133,26 +133,23 @@ void initFBO();
 void destroy();
 void resizeFBO(unsigned int w, unsigned int h);
 
-
 //Carga el shader indicado, devuele el ID del shader
 //!Por implementar
-GLuint loadShader(const char *fileName, GLenum type);
+GLuint loadShader(const char* fileName, GLenum type);
 
-//Crea una textura, la configura, la sube a OpenGL, 
-//y devuelve el identificador de la textura 
+//Crea una textura, la configura, la sube a OpenGL,
+//y devuelve el identificador de la textura
 //!!Por implementar
-unsigned int loadTex(const char *fileName);
+unsigned int loadTex(const char* fileName);
 
 //////////////////////////////////////////////////////////////
 // Nuevas variables auxiliares
 //////////////////////////////////////////////////////////////
 
-
 //////////////////////////////////////////////////////////////
 // Nuevas funciones auxiliares
 //////////////////////////////////////////////////////////////
 //!!Por implementar
-
 
 int main(int argc, char** argv)
 {
@@ -161,13 +158,13 @@ int main(int argc, char** argv)
 	initContext(argc, argv);
 	initOGL();
 	initShaderFw("../shaders_P4/fwRendering.v1.vert", "../shaders_P4/fwRendering.v2.frag");
-	initShaderPP("../shaders_P4/postProcessing.v1.vert", "../shaders_P4/postProcessing.v4.frag");
+	initShaderPP("../shaders_P4/postProcessing.v1.vert", "../shaders_P4/postProcessing.v6.frag");
 
 	initObj();
 	initPlane();
 
 	initFBO();
-	
+
 	glutMainLoop();
 
 	destroy();
@@ -176,7 +173,7 @@ int main(int argc, char** argv)
 }
 
 //////////////////////////////////////////
-// Funciones auxiliares 
+// Funciones auxiliares
 void initContext(int argc, char** argv)
 {
 	glutInit(&argc, argv);
@@ -198,7 +195,7 @@ void initContext(int argc, char** argv)
 		exit(-1);
 	}
 
-	const GLubyte *oglVersion = glGetString(GL_VERSION);
+	const GLubyte* oglVersion = glGetString(GL_VERSION);
 	std::cout << "This system supports OpenGL Version: " << oglVersion << std::endl;
 
 	glutReshapeFunc(resizeFunc);
@@ -234,7 +231,6 @@ void initOGL()
 		mask_9d[i] = mask1[i];
 }
 
-
 void destroy()
 {
 	glDetachShader(program, vshader);
@@ -266,10 +262,9 @@ void destroy()
 	glDeleteFramebuffers(1, &fbo);
 	glDeleteTextures(1, &colorBuffTexId);
 	glDeleteTextures(1, &depthBuffTexId);
-
 }
 
-void initShaderFw(const char *vname, const char *fname)
+void initShaderFw(const char* vname, const char* fname)
 {
 	vshader = loadShader(vname, GL_VERTEX_SHADER);
 	fshader = loadShader(fname, GL_FRAGMENT_SHADER);
@@ -283,7 +278,6 @@ void initShaderFw(const char *vname, const char *fname)
 	glBindAttribLocation(program, 2, "inNormal");
 	glBindAttribLocation(program, 3, "inTexCoord");
 
-
 	glLinkProgram(program);
 
 	int linked;
@@ -294,7 +288,7 @@ void initShaderFw(const char *vname, const char *fname)
 		GLint logLen;
 		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLen);
 
-		char *logString = new char[logLen];
+		char* logString = new char[logLen];
 		glGetProgramInfoLog(program, logLen, NULL, logString);
 		std::cout << "Error: " << logString << std::endl;
 		delete[] logString;
@@ -327,7 +321,7 @@ void initShaderPP(const char* vname, const char* fname)
 	glAttachShader(postProccesProgram, postProccesFShader);
 
 	glBindAttribLocation(postProccesProgram, 0, "inPos");
-	
+
 	glLinkProgram(postProccesProgram);
 	int linked;
 	glGetProgramiv(postProccesProgram, GL_LINK_STATUS, &linked);
@@ -346,7 +340,7 @@ void initShaderPP(const char* vname, const char* fname)
 	}
 
 	inPosPP = glGetAttribLocation(postProccesProgram, "inPos");
-	
+
 	glUseProgram(postProccesProgram);
 
 	uColorTexPP = glGetUniformLocation(postProccesProgram, "colorTex");
@@ -367,6 +361,7 @@ void initShaderPP(const char* vname, const char* fname)
 	uMask25 = glGetUniformLocation(postProccesProgram, "mask25");
 	uTexIdx25 = glGetUniformLocation(postProccesProgram, "texIdx25");
 	uMaskSize = glGetUniformLocation(postProccesProgram, "maskSize");
+	uTime = glGetUniformLocation(postProccesProgram, "time");
 	uMaskSelector = glGetUniformLocation(postProccesProgram, "maskSelector");
 }
 
@@ -379,7 +374,7 @@ void initObj()
 	{
 		glGenBuffers(1, &posVBO);
 		glBindBuffer(GL_ARRAY_BUFFER, posVBO);
-		glBufferData(GL_ARRAY_BUFFER, cubeNVertex*sizeof(float) * 3,
+		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 3,
 			cubeVertexPos, GL_STATIC_DRAW);
 		glVertexAttribPointer(inPos, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(inPos);
@@ -389,7 +384,7 @@ void initObj()
 	{
 		glGenBuffers(1, &colorVBO);
 		glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
-		glBufferData(GL_ARRAY_BUFFER, cubeNVertex*sizeof(float) * 3,
+		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 3,
 			cubeVertexColor, GL_STATIC_DRAW);
 		glVertexAttribPointer(inColor, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(inColor);
@@ -399,18 +394,17 @@ void initObj()
 	{
 		glGenBuffers(1, &normalVBO);
 		glBindBuffer(GL_ARRAY_BUFFER, normalVBO);
-		glBufferData(GL_ARRAY_BUFFER, cubeNVertex*sizeof(float) * 3,
+		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 3,
 			cubeVertexNormal, GL_STATIC_DRAW);
 		glVertexAttribPointer(inNormal, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(inNormal);
 	}
 
-
 	if (inTexCoord != -1)
 	{
 		glGenBuffers(1, &texCoordVBO);
 		glBindBuffer(GL_ARRAY_BUFFER, texCoordVBO);
-		glBufferData(GL_ARRAY_BUFFER, cubeNVertex*sizeof(float) * 2,
+		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 2,
 			cubeVertexTexCoord, GL_STATIC_DRAW);
 		glVertexAttribPointer(inTexCoord, 2, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(inTexCoord);
@@ -419,7 +413,7 @@ void initObj()
 	glGenBuffers(1, &triangleIndexVBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, triangleIndexVBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-		cubeNTriangleIndex*sizeof(unsigned int) * 3, cubeTriangleIndex,
+		cubeNTriangleIndex * sizeof(unsigned int) * 3, cubeTriangleIndex,
 		GL_STATIC_DRAW);
 
 	model = glm::mat4(1.0f);
@@ -427,7 +421,6 @@ void initObj()
 	colorTexId = loadTex("../img/color2.png");
 	emiTexId = loadTex("../img/emissive.png");
 }
-
 
 void initPlane()
 {
@@ -439,23 +432,22 @@ void initPlane()
 
 	glBufferData(GL_ARRAY_BUFFER, planeNVertex * sizeof(float) * 3,
 		planeVertexPos, GL_STATIC_DRAW);
-	
+
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(0);
-
 }
 
-GLuint loadShader(const char *fileName, GLenum type)
+GLuint loadShader(const char* fileName, GLenum type)
 {
 	unsigned int fileLen;
-	char *source = loadStringFromFile(fileName, fileLen);
+	char* source = loadStringFromFile(fileName, fileLen);
 
 	//////////////////////////////////////////////
 	//Creación y compilación del Shader
 	GLuint shader;
 	shader = glCreateShader(type);
 	glShaderSource(shader, 1,
-		(const GLchar **)&source, (const GLint *)&fileLen);
+		(const GLchar**)&source, (const GLint*)&fileLen);
 	glCompileShader(shader);
 	delete[] source;
 
@@ -468,7 +460,7 @@ GLuint loadShader(const char *fileName, GLenum type)
 		GLint logLen;
 		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLen);
 
-		char *logString = new char[logLen];
+		char* logString = new char[logLen];
 		glGetShaderInfoLog(shader, logLen, NULL, logString);
 		std::cout << "Error: " << logString << std::endl;
 		delete[] logString;
@@ -480,9 +472,9 @@ GLuint loadShader(const char *fileName, GLenum type)
 	return shader;
 }
 
-unsigned int loadTex(const char *fileName)
+unsigned int loadTex(const char* fileName)
 {
-	unsigned char *map;
+	unsigned char* map;
 	unsigned int w, h;
 	map = loadTexture(fileName, w, h);
 
@@ -532,7 +524,6 @@ void renderFunc()
 		glUniform1i(uEmiTex, 1);
 	}
 
-
 	model = glm::mat4(2.0f);
 	model[3].w = 1.0f;
 	model = glm::rotate(model, angle, glm::vec3(1.0f, 1.0f, 0.0f));
@@ -554,15 +545,15 @@ void renderFunc()
 		transVec.y *= (std::rand() % 2) ? 1.0f : -1.0f;
 		transVec.z *= (std::rand() % 2) ? 1.0f : -1.0f;
 
-		model = glm::rotate(glm::mat4(1.0f), angle*2.0f*size, axis);
+		model = glm::rotate(glm::mat4(1.0f), angle * 2.0f * size, axis);
 		model = glm::translate(model, transVec);
-		model = glm::rotate(model, angle*2.0f*size, axis);
-		model = glm::scale(model, glm::vec3(1.0f / (size*0.7f)));
+		model = glm::rotate(model, angle * 2.0f * size, axis);
+		model = glm::scale(model, glm::vec3(1.0f / (size * 0.7f)));
 		renderCube();
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	
+
 	glUseProgram(postProccesProgram);
 
 	if (uFocalDistance != -1)
@@ -572,7 +563,7 @@ void renderFunc()
 
 	if (uMaxDistanceFactor != -1)
 	{
-		glUniform1f(uMaxDistanceFactor, 1/maxDistanceFactor);
+		glUniform1f(uMaxDistanceFactor, 1 / maxDistanceFactor);
 	}
 
 	if (uNear != -1)
@@ -587,7 +578,7 @@ void renderFunc()
 
 	if (uMaskSize != -1)
 	{
-		if(maskSelector < 4)
+		if (maskSelector < 4)
 			glUniform1i(uMaskSize, maskSize9);
 		else
 			glUniform1i(uMaskSize, maskSize25);
@@ -605,7 +596,7 @@ void renderFunc()
 
 	if (uTexIdx9 != -1)
 	{
-		for (int i = 0; i != maskSize9; ++i) 
+		for (int i = 0; i != maskSize9; ++i)
 		{
 			GLint originsLoc = glGetUniformLocation(postProccesProgram, ("texIdx9[" + std::to_string(i) + "]").c_str());
 			glUniform2f(originsLoc, texIdx9[i].x, texIdx9[i].y);
@@ -626,8 +617,10 @@ void renderFunc()
 		}
 	}
 
-
-
+	if (uTime != -1)
+	{
+		glUniform1f(uTime, glutGet(GLUT_ELAPSED_TIME));
+	}
 
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
@@ -638,14 +631,12 @@ void renderFunc()
 	//glBlendColor(motionColor, motionColor, motionColor, motionAlpha);
 	//glBlendEquation(GL_FUNC_ADD);
 
-
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, colorBuffTexId);
 
 	glActiveTexture(GL_TEXTURE0 + 1);
-	glBindTexture(GL_TEXTURE_2D, vertexBuffTexId);
+	glBindTexture(GL_TEXTURE_2D, depthBuffTexId);
 
-	
 	glBindVertexArray(planeVAO);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
@@ -664,24 +655,22 @@ void renderCube()
 
 	if (uModelViewMat != -1)
 		glUniformMatrix4fv(uModelViewMat, 1, GL_FALSE,
-		&(modelView[0][0]));
+			&(modelView[0][0]));
 	if (uModelViewProjMat != -1)
 		glUniformMatrix4fv(uModelViewProjMat, 1, GL_FALSE,
-		&(modelViewProj[0][0]));
+			&(modelViewProj[0][0]));
 	if (uNormalMat != -1)
 		glUniformMatrix4fv(uNormalMat, 1, GL_FALSE,
-		&(normal[0][0]));
-	
+			&(normal[0][0]));
+
 	glBindVertexArray(vao);
 	glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
 }
 
-
-
 void resizeFunc(int width, int height)
 {
 	glViewport(0, 0, width, height);
-	proj = glm::perspective(glm::radians(60.0f), float(width) /float(height), projNear, projFar);
+	proj = glm::perspective(glm::radians(60.0f), float(width) / float(height), projNear, projFar);
 
 	resizeFBO(width, height);
 
@@ -691,7 +680,7 @@ void resizeFunc(int width, int height)
 void idleFunc()
 {
 	angle = (angle > 3.141592f * 2.0f) ? 0 : angle + 0.02f;
-	
+
 	glutPostRedisplay();
 }
 
@@ -713,13 +702,13 @@ void keyboardFunc(unsigned char key, int x, int y)
 		break;
 	case('5'):
 		focalDistance = std::max(-100.0f, focalDistance - 0.25f);
-		break;	
+		break;
 	case('6'):
 		focalDistance = std::min(0.0f, focalDistance + 0.25f);
 		break;
 	case('7'):
 		maxDistanceFactor = std::min(100.0f, maxDistanceFactor + 0.1f);
-		break;	
+		break;
 	case('8'):
 		maxDistanceFactor = std::max(0.1f, maxDistanceFactor - 0.1f);
 		break;
@@ -737,7 +726,7 @@ void keyboardFunc(unsigned char key, int x, int y)
 			break;
 		case(2):
 			for (int i = 0; i < maskSize9; ++i)
-				mask_9d[i] = northDirectionMask[i]; 
+				mask_9d[i] = northDirectionMask[i];
 			break;
 		case(3):
 			for (int i = 0; i < maskSize9; ++i)
@@ -747,8 +736,7 @@ void keyboardFunc(unsigned char key, int x, int y)
 		break;
 	}
 }
-void mouseFunc(int button, int state, int x, int y){}
-
+void mouseFunc(int button, int state, int x, int y) {}
 
 void initFBO()
 {
@@ -760,7 +748,6 @@ void initFBO()
 	resizeFBO(SCREEN_SIZE);
 }
 
-
 void resizeFBO(unsigned int w, unsigned int h)
 {
 	glBindTexture(GL_TEXTURE_2D, colorBuffTexId);
@@ -769,7 +756,7 @@ void resizeFBO(unsigned int w, unsigned int h)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	
+
 	glBindTexture(GL_TEXTURE_2D, depthBuffTexId);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -780,8 +767,6 @@ void resizeFBO(unsigned int w, unsigned int h)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	
-	
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffTexId, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthBuffTexId, 0);
@@ -797,4 +782,3 @@ void resizeFBO(unsigned int w, unsigned int h)
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
-
