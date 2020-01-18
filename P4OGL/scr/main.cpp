@@ -163,8 +163,8 @@ int main(int argc, char** argv)
 
 	initContext(argc, argv);
 	initOGL();
-	initShaderFw("../shaders_P4/fwRendering.v7.vert", "../shaders_P4/fwRendering.v7.frag");
-	initShaderPP("../shaders_P4/postProcessing.v7.vert", "../shaders_P4/postProcessing.v7.frag");
+	initShaderFw("../shaders_P4/fwRendering.v3.vert", "../shaders_P4/fwRendering.v3.frag");
+	initShaderPP("../shaders_P4/postProcessing.v3.vert", "../shaders_P4/postProcessing.v3.frag");
 
 	initObj();
 	initPlane();
@@ -361,7 +361,7 @@ void initShaderPP(const char* vname, const char* fname)
 	uNormalTexPP = glGetUniformLocation(postProccesProgram, "normalTex");
 	if (uNormalTexPP != -1)
 		glUniform1i(uNormalTexPP, 2);
-	
+
 	uEmiTexPP = glGetUniformLocation(postProccesProgram, "emiTex");
 	if (uEmiTexPP != -1)
 		glUniform1i(uEmiTexPP, 3);
@@ -659,11 +659,11 @@ void renderFunc()
 	glActiveTexture(GL_TEXTURE0 + 2);
 	glBindTexture(GL_TEXTURE_2D, normalBuffTexId);
 
-	glActiveTexture(GL_TEXTURE0 + 4);
-	glBindTexture(GL_TEXTURE_2D, depthBuffTexId);
 	glActiveTexture(GL_TEXTURE0 + 3);
 	glBindTexture(GL_TEXTURE_2D, emiBuffTexId);
 
+	glActiveTexture(GL_TEXTURE0 + 4);
+	glBindTexture(GL_TEXTURE_2D, depthBuffTexId);
 
 	glBindVertexArray(planeVAO);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -671,7 +671,6 @@ void renderFunc()
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
-
 	glutSwapBuffers();
 }
 
@@ -808,8 +807,6 @@ void resizeFBO(unsigned int w, unsigned int h)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-
-
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffTexId, 0);

@@ -1,4 +1,7 @@
 #version 330 core
+//OBLIGATORIO 3
+//Controlar el depth of field con el buffer de profundidad.
+
 //Color salida 
 layout (location = 0) out vec4 outColor;
 
@@ -14,24 +17,6 @@ uniform float far;
 
 //Variables Variantes 
 in vec2 texCoord;
-
-/*
-#define MASK_SIZE 9u
-const float maskFactor = float (1.0/14.0);
-const vec2 texIdx[MASK_SIZE] = vec2[](
-	vec2(-1.0,1.0), vec2(0.0,1.0), vec2(1.0,1.0),
-	vec2(-1.0,0.0), vec2(0.0,0.0), vec2(1.0,0.0),
-	vec2(-1.0,-1.0), vec2(0.0,-1.0), vec2(1.0,-1.0)); 
-const float mask[MASK_SIZE] = float[](
-	float (1.0*maskFactor), float (2.0*maskFactor), float (1.0*maskFactor),
-	float (2.0*maskFactor), float (2.0*maskFactor), float (2.0*maskFactor),
-	float (1.0*maskFactor), float (2.0*maskFactor), float (1.0*maskFactor));
-
-	const float mask[MASK_SIZE] = float[](
-	float (0.0), float (-1.0), float (0.0),
-	float (0.0), float (1.0), float (0.0),
-	float (0.0), float (0.0), float (0.0));
-	*/
 
 #define MASK_SIZE 25u
 const vec2 texIdx[MASK_SIZE] = vec2[](
@@ -50,15 +35,14 @@ const float mask[MASK_SIZE] = float[](
 	2.0*maskFactor, 3.0*maskFactor, 4.0*maskFactor, 3.0*maskFactor, 2.0*maskFactor,
 	1.0*maskFactor, 2.0*maskFactor, 3.0*maskFactor, 2.0*maskFactor, 1.0*maskFactor);
 
-
 void main()
 {
 	//Sería más rápido utilizar una variable uniform el tamaño de la textura.
 	vec2 ts = vec2(1.0) / vec2 (textureSize (colorTex, 0));
 
-	float vz = -(near * far) / (far + texture(depthTex, texCoord).z * (near - far)) ;
-	//float dof = abs(texture(vertexTex, texCoord).r - focalDistance) * maxDistanceFactor;
+	float vz = -(near * far) / (far + texture(depthTex, texCoord).x * (near - far)) ;
 	float dof = abs(vz - focalDistance) * maxDistanceFactor;
+
 	dof = clamp (dof, 0.0, 1.0);
 	dof *= dof;
 	vec4 color = vec4 (0.0);
@@ -69,5 +53,6 @@ void main()
 		color += texture(colorTex, iidx, 0.0) * mask[i];
 	}
 
-	outColor = color;
+    outColor = color;
+
 }
