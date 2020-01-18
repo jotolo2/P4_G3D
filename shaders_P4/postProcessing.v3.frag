@@ -5,6 +5,7 @@ layout (location = 0) out vec4 outColor;
 //Textura 
 uniform sampler2D colorTex;
 uniform sampler2D vertexTex;
+uniform sampler2D depthTex;
 
 uniform float focalDistance; /* = -25.0*/
 uniform float maxDistanceFactor; /*= 1.0/5.0*/
@@ -55,7 +56,7 @@ void main()
 	//Sería más rápido utilizar una variable uniform el tamaño de la textura.
 	vec2 ts = vec2(1.0) / vec2 (textureSize (colorTex, 0));
 
-	float vz = -(near * far) / (far + texture(vertexTex, texCoord).z * (near - far)) ;
+	float vz = -(near * far) / (far + texture(depthTex, texCoord).z * (near - far)) ;
 	//float dof = abs(texture(vertexTex, texCoord).r - focalDistance) * maxDistanceFactor;
 	float dof = abs(vz - focalDistance) * maxDistanceFactor;
 	dof = clamp (dof, 0.0, 1.0);
@@ -68,5 +69,5 @@ void main()
 		color += texture(colorTex, iidx, 0.0) * mask[i];
 	}
 
-	outColor = abs(texture(vertexTex, texCoord).yyyy);
+	outColor = color;
 }

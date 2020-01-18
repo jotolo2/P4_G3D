@@ -41,7 +41,6 @@ float angle = 0.0f;
 
 unsigned int fbo;
 
-
 //VAO
 unsigned int vao;
 
@@ -100,6 +99,7 @@ unsigned int postProccesProgram;
 unsigned int uColorTexPP;
 unsigned int uVertexTexPP;
 unsigned int uNormalTexPP;
+unsigned int uDepthTexPP;
 
 unsigned int colorBuffTexId;
 unsigned int depthBuffTexId;
@@ -108,7 +108,6 @@ unsigned int normalBuffTexId;
 
 //Atributos
 int inPosPP;
-
 
 //Control de parámetros
 float motionAlpha, motionColor;
@@ -163,7 +162,7 @@ int main(int argc, char** argv)
 	initContext(argc, argv);
 	initOGL();
 	initShaderFw("../shaders_P4/fwRendering.v1.vert", "../shaders_P4/fwRendering.v2.frag");
-	initShaderPP("../shaders_P4/postProcessing.v1.vert", "../shaders_P4/postProcessing.v6.frag");
+	initShaderPP("../shaders_P4/postProcessing.v1.vert", "../shaders_P4/postProcessing.v3.frag");
 
 	initObj();
 	initPlane();
@@ -360,6 +359,10 @@ void initShaderPP(const char* vname, const char* fname)
 	uNormalTexPP = glGetUniformLocation(postProccesProgram, "normalTex");
 	if (uNormalTexPP != -1)
 		glUniform1i(uNormalTexPP, 2);
+
+	uDepthTexPP = glGetUniformLocation(postProccesProgram, "depthTex");
+	if (uDepthTexPP != -1)
+		glUniform1i(uDepthTexPP, 4);
 
 	uFocalDistance = glGetUniformLocation(postProccesProgram, "focalDistance");
 	uMaxDistanceFactor = glGetUniformLocation(postProccesProgram, "maxDistanceFactor");
@@ -650,6 +653,8 @@ void renderFunc()
 	glActiveTexture(GL_TEXTURE0 + 2);
 	glBindTexture(GL_TEXTURE_2D, normalBuffTexId);
 
+	glActiveTexture(GL_TEXTURE0 + 4);
+	glBindTexture(GL_TEXTURE_2D, depthBuffTexId);
 
 	glBindVertexArray(planeVAO);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -786,8 +791,6 @@ void resizeFBO(unsigned int w, unsigned int h)
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffTexId, 0);

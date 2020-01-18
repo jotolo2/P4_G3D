@@ -2,6 +2,7 @@
 
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outVertex;
+layout(location = 4) out vec4 outDepth;
 
 in vec3 color;
 in vec3 pos;
@@ -36,9 +37,9 @@ void main()
 
 	N = normalize (norm);
 	
-	outVertex = vec4(pos.zzz, 0.0);
-
+	outVertex = vec4(pos.xyz, 0.0);
 	outColor = vec4(shade(), 1.0);   
+	outDepth = vec4(pos.zzz,1.0);
 }
 
 vec3 shade()
