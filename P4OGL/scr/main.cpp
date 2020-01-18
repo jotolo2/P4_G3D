@@ -100,8 +100,10 @@ unsigned int uColorTexPP;
 unsigned int uVertexTexPP;
 unsigned int uNormalTexPP;
 unsigned int uDepthTexPP;
+unsigned int uEmiTexPP;
 
 unsigned int colorBuffTexId;
+unsigned int emiBuffTexId;
 unsigned int depthBuffTexId;
 unsigned int vertexBuffTexId;
 unsigned int normalBuffTexId;
@@ -161,8 +163,8 @@ int main(int argc, char** argv)
 
 	initContext(argc, argv);
 	initOGL();
-	initShaderFw("../shaders_P4/fwRendering.v1.vert", "../shaders_P4/fwRendering.v2.frag");
-	initShaderPP("../shaders_P4/postProcessing.v1.vert", "../shaders_P4/postProcessing.v3.frag");
+	initShaderFw("../shaders_P4/fwRendering.v7.vert", "../shaders_P4/fwRendering.v7.frag");
+	initShaderPP("../shaders_P4/postProcessing.v7.vert", "../shaders_P4/postProcessing.v7.frag");
 
 	initObj();
 	initPlane();
@@ -359,6 +361,10 @@ void initShaderPP(const char* vname, const char* fname)
 	uNormalTexPP = glGetUniformLocation(postProccesProgram, "normalTex");
 	if (uNormalTexPP != -1)
 		glUniform1i(uNormalTexPP, 2);
+	
+	uEmiTexPP = glGetUniformLocation(postProccesProgram, "emiTex");
+	if (uEmiTexPP != -1)
+		glUniform1i(uEmiTexPP, 3);
 
 	uDepthTexPP = glGetUniformLocation(postProccesProgram, "depthTex");
 	if (uDepthTexPP != -1)
@@ -644,7 +650,7 @@ void renderFunc()
 	//glBlendColor(motionColor, motionColor, motionColor, motionAlpha);
 	//glBlendEquation(GL_FUNC_ADD);
 
-	glActiveTexture(GL_TEXTURE0);
+	glActiveTexture(GL_TEXTURE0 + 0);
 	glBindTexture(GL_TEXTURE_2D, colorBuffTexId);
 
 	glActiveTexture(GL_TEXTURE0 + 1);
@@ -655,6 +661,9 @@ void renderFunc()
 
 	glActiveTexture(GL_TEXTURE0 + 4);
 	glBindTexture(GL_TEXTURE_2D, depthBuffTexId);
+	glActiveTexture(GL_TEXTURE0 + 3);
+	glBindTexture(GL_TEXTURE_2D, emiBuffTexId);
+
 
 	glBindVertexArray(planeVAO);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -764,6 +773,7 @@ void initFBO()
 	glGenTextures(1, &depthBuffTexId);
 	glGenTextures(1, &vertexBuffTexId);
 	glGenTextures(1, &normalBuffTexId);
+	glGenTextures(1, &emiBuffTexId);
 
 	resizeFBO(SCREEN_SIZE);
 }
@@ -792,14 +802,24 @@ void resizeFBO(unsigned int w, unsigned int h)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
+	glBindTexture(GL_TEXTURE_2D, emiBuffTexId);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+
+
+
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffTexId, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthBuffTexId, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, vertexBuffTexId, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, normalBuffTexId, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, emiBuffTexId, 0);
 
-	const GLenum buffs[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-	glDrawBuffers(3, buffs);
+	const GLenum buffs[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
+	glDrawBuffers(4, buffs);
 
 	if (GL_FRAMEBUFFER_COMPLETE != glCheckFramebufferStatus(GL_FRAMEBUFFER))
 	{
