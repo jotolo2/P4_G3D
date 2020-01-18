@@ -635,7 +635,7 @@ void renderFunc()
 	glBindTexture(GL_TEXTURE_2D, colorBuffTexId);
 
 	glActiveTexture(GL_TEXTURE0 + 1);
-	glBindTexture(GL_TEXTURE_2D, depthBuffTexId);
+	glBindTexture(GL_TEXTURE_2D, vertexBuffTexId);
 
 	glBindVertexArray(planeVAO);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
