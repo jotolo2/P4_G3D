@@ -20,29 +20,14 @@
 #define SCREEN_SIZE 500,500
 
 //////////////////////////////////////////////////////////////
-// Datos que se almacenan en la memoria de la CPU
-//////////////////////////////////////////////////////////////
-
-//Matrices
-glm::mat4	proj = glm::mat4(1.0f);
-glm::mat4	view = glm::mat4(1.0f);
-glm::mat4	model = glm::mat4(1.0f);
-
-float focalDistance;
-float maxDistanceFactor;
-
-int maskSelector;
-float mask_9d[9];
-
-//////////////////////////////////////////////////////////////
 // Variables que nos dan acceso a Objetos OpenGL
 //////////////////////////////////////////////////////////////
-float angle = 0.0f;
-
-unsigned int fbo;
 
 //VAO
 unsigned int vao;
+
+//VBO
+unsigned int fbo;
 
 //VBOs que forman parte del objeto
 unsigned int posVBO;
@@ -51,38 +36,15 @@ unsigned int normalVBO;
 unsigned int texCoordVBO;
 unsigned int triangleIndexVBO;
 
-unsigned int colorTexId;
-unsigned int emiTexId;
-
 unsigned int planeVAO;
 unsigned int planeVertexVBO;
 
-//Por definir
-unsigned int vshader;
-unsigned int fshader;
-unsigned int program;
-
-//Variables Uniform
-int uModelViewMat;
-int uModelViewProjMat;
-int uNormalMat;
-int uFocalDistance;
-int uMaxDistanceFactor;
-int uNear;
-int uFar;
-
-int uMaskSize;
-int uTexIdx9;
-int uTexIdx25;
-int uMask9;
-int uMask25;
-int uMaskSelector;
-
-int uTime;
-
-//Texturas Uniform
-int uColorTex;
-int uEmiTex;
+///////////
+//Forward-rendering
+///////////
+unsigned int forwardVShader;
+unsigned int forwardFShader;
+unsigned int forwardProgram;
 
 //Atributos
 int inPos;
@@ -90,30 +52,87 @@ int inColor;
 int inNormal;
 int inTexCoord;
 
+//Matrices Uniform
+int uModelViewMat;
+int uModelViewProjMat;
+int uNormalMat;
+
+//Identificadores de texturas Forward-rendering
+unsigned int colorTexId;
+unsigned int emiTexId;
+
+//Texturas Uniform
+int uColorTex;
+int uEmiTex;
+
+///////////
 //Post-proceso
+///////////
 unsigned int postProccesVShader;
 unsigned int postProccesFShader;
 unsigned int postProccesProgram;
 
-//Uniform
-unsigned int uColorTexPP;
-unsigned int uVertexTexPP;
-unsigned int uNormalTexPP;
-unsigned int uDepthTexPP;
-unsigned int uEmiTexPP;
+//Atributos
+int inPosPP;
 
+//Uniforms de la distancia focal
+int uFocalDistance;
+int uMaxDistanceFactor;
+int uNear;
+int uFar;
+
+//Uniforms para las máscaras de convolución
+int uTexIdx9;
+int uTexIdx25;
+int uMask9;
+int uMask25;
+int uMaskSelector;
+
+//Identificadores de texturas Post-proceso
 unsigned int colorBuffTexId;
 unsigned int emiBuffTexId;
 unsigned int depthBuffTexId;
 unsigned int vertexBuffTexId;
 unsigned int normalBuffTexId;
 
-//Atributos
-int inPosPP;
+//Texturas Post-proceso
+unsigned int uColorTexPP;
+unsigned int uVertexTexPP;
+unsigned int uNormalTexPP;
+unsigned int uDepthTexPP;
+unsigned int uEmiTexPP;
 
-//Control de parámetros
+//Uniform para el post-procesado del noise
+int uTime;
+int uUseNoise;
+
+//////////////////////////////////////////////////////////////
+// Datos que se almacenan en la memoria de la CPU
+//////////////////////////////////////////////////////////////
+
+float angle = 0.0f;
+
+//Matrices
+glm::mat4	proj = glm::mat4(1.0f);
+glm::mat4	view = glm::mat4(1.0f);
+glm::mat4	model = glm::mat4(1.0f);
+
+//Variables de control de la distancia focal
+float focalDistance;
+float maxDistanceFactor;
+
+//Variables de control para las máscaras de convolución
+int maskSelector;
+float mask_9d[9];
+
+//Variables de control del motion Blur
 float motionAlpha, motionColor;
+bool useBlend;
+bool useNoise;
+
+//Variables de control del near y far de la matriz de proyección y para el cálculo de profundidad
 float projNear, projFar;
+
 
 //////////////////////////////////////////////////////////////
 // Funciones auxiliares
@@ -163,8 +182,8 @@ int main(int argc, char** argv)
 
 	initContext(argc, argv);
 	initOGL();
-	initShaderFw("../shaders_P4/fwRendering.v3.vert", "../shaders_P4/fwRendering.v3.frag");
-	initShaderPP("../shaders_P4/postProcessing.v3.vert", "../shaders_P4/postProcessing.v3.frag");
+	initShaderFw("../shaders_P4/fwRendering.v0.vert", "../shaders_P4/fwRendering.v0.frag");
+	initShaderPP("../shaders_P4/postProcessing.v0.vert", "../shaders_P4/postProcessing.v0.frag");
 
 	initObj();
 	initPlane();
@@ -222,28 +241,35 @@ void initOGL()
 
 	projNear = 1.0f;
 	projFar = 50.0f;
-
 	proj = glm::perspective(glm::radians(60.0f), 1.0f, projNear, projFar);
+
+	//Inicializamos la cámara en -25
 	view = glm::mat4(1.0f);
 	view[3].z = -25.0f;
 
+	//Inicializamos los valores para el motion blur
 	motionAlpha = 0.6;
 	motionColor = 0.5;
+	useBlend = false;
+	useNoise = false;
+
+	//Inicializamos los valores para controlar la distancia focal
 	focalDistance = -25.0;
 	maxDistanceFactor = 5;
-	maskSelector = 0;
 
-	for (int i = 0; i < maskSize9; ++i)
-		mask_9d[i] = mask1[i];
+	//Establecemos la máscara de convolución primera
+	maskSelector = 0;
+	for (int i = 0; i < 9; ++i)
+		mask_9d[i] = defaultMask[i];
 }
 
 void destroy()
 {
-	glDetachShader(program, vshader);
-	glDetachShader(program, fshader);
-	glDeleteShader(vshader);
-	glDeleteShader(fshader);
-	glDeleteProgram(program);
+	glDetachShader(forwardProgram, forwardVShader);
+	glDetachShader(forwardProgram, forwardFShader);
+	glDeleteShader(forwardVShader);
+	glDeleteShader(forwardFShader);
+	glDeleteProgram(forwardProgram);
 
 	glDetachShader(postProccesProgram, postProccesVShader);
 	glDetachShader(postProccesProgram, postProccesFShader);
@@ -269,53 +295,55 @@ void destroy()
 	glDeleteTextures(1, &colorBuffTexId);
 	glDeleteTextures(1, &depthBuffTexId);
 	glDeleteTextures(1, &vertexBuffTexId);
+	glDeleteTextures(1, &emiBuffTexId);
+	glDeleteTextures(1, &normalBuffTexId);
 }
 
 void initShaderFw(const char* vname, const char* fname)
 {
-	vshader = loadShader(vname, GL_VERTEX_SHADER);
-	fshader = loadShader(fname, GL_FRAGMENT_SHADER);
+	forwardVShader = loadShader(vname, GL_VERTEX_SHADER);
+	forwardFShader = loadShader(fname, GL_FRAGMENT_SHADER);
 
-	program = glCreateProgram();
-	glAttachShader(program, vshader);
-	glAttachShader(program, fshader);
+	forwardProgram = glCreateProgram();
+	glAttachShader(forwardProgram, forwardVShader);
+	glAttachShader(forwardProgram, forwardFShader);
 
-	glBindAttribLocation(program, 0, "inPos");
-	glBindAttribLocation(program, 1, "inColor");
-	glBindAttribLocation(program, 2, "inNormal");
-	glBindAttribLocation(program, 3, "inTexCoord");
+	glBindAttribLocation(forwardProgram, 0, "inPos");
+	glBindAttribLocation(forwardProgram, 1, "inColor");
+	glBindAttribLocation(forwardProgram, 2, "inNormal");
+	glBindAttribLocation(forwardProgram, 3, "inTexCoord");
 
-	glLinkProgram(program);
+	glLinkProgram(forwardProgram);
 
 	int linked;
-	glGetProgramiv(program, GL_LINK_STATUS, &linked);
+	glGetProgramiv(forwardProgram, GL_LINK_STATUS, &linked);
 	if (!linked)
 	{
 		//Calculamos una cadena de error
 		GLint logLen;
-		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLen);
+		glGetProgramiv(forwardProgram, GL_INFO_LOG_LENGTH, &logLen);
 
 		char* logString = new char[logLen];
-		glGetProgramInfoLog(program, logLen, NULL, logString);
+		glGetProgramInfoLog(forwardProgram, logLen, NULL, logString);
 		std::cout << "Error: " << logString << std::endl;
 		delete[] logString;
 
-		glDeleteProgram(program);
-		program = 0;
+		glDeleteProgram(forwardProgram);
+		forwardProgram = 0;
 		exit(-1);
 	}
 
-	uNormalMat = glGetUniformLocation(program, "normal");
-	uModelViewMat = glGetUniformLocation(program, "modelView");
-	uModelViewProjMat = glGetUniformLocation(program, "modelViewProj");
+	uNormalMat = glGetUniformLocation(forwardProgram, "normal");
+	uModelViewMat = glGetUniformLocation(forwardProgram, "modelView");
+	uModelViewProjMat = glGetUniformLocation(forwardProgram, "modelViewProj");
 
-	uColorTex = glGetUniformLocation(program, "colorTex");
-	uEmiTex = glGetUniformLocation(program, "emiTex");
+	uColorTex = glGetUniformLocation(forwardProgram, "colorTex");
+	uEmiTex = glGetUniformLocation(forwardProgram, "emiTex");
 
-	inPos = glGetAttribLocation(program, "inPos");
-	inColor = glGetAttribLocation(program, "inColor");
-	inNormal = glGetAttribLocation(program, "inNormal");
-	inTexCoord = glGetAttribLocation(program, "inTexCoord");
+	inPos = glGetAttribLocation(forwardProgram, "inPos");
+	inColor = glGetAttribLocation(forwardProgram, "inColor");
+	inNormal = glGetAttribLocation(forwardProgram, "inNormal");
+	inTexCoord = glGetAttribLocation(forwardProgram, "inTexCoord");
 }
 
 void initShaderPP(const char* vname, const char* fname)
@@ -350,6 +378,7 @@ void initShaderPP(const char* vname, const char* fname)
 
 	glUseProgram(postProccesProgram);
 
+	//Establecimiento de los localizadores de las texturas/buffers de post-proceso
 	uColorTexPP = glGetUniformLocation(postProccesProgram, "colorTex");
 	if (uColorTexPP != -1)
 		glUniform1i(uColorTexPP, 0);
@@ -370,6 +399,7 @@ void initShaderPP(const char* vname, const char* fname)
 	if (uDepthTexPP != -1)
 		glUniform1i(uDepthTexPP, 4);
 
+	//Localizadores de las variables uniform
 	uFocalDistance = glGetUniformLocation(postProccesProgram, "focalDistance");
 	uMaxDistanceFactor = glGetUniformLocation(postProccesProgram, "maxDistanceFactor");
 	uNear = glGetUniformLocation(postProccesProgram, "near");
@@ -379,9 +409,9 @@ void initShaderPP(const char* vname, const char* fname)
 	uTexIdx9 = glGetUniformLocation(postProccesProgram, "texIdx9");
 	uMask25 = glGetUniformLocation(postProccesProgram, "mask25");
 	uTexIdx25 = glGetUniformLocation(postProccesProgram, "texIdx25");
-	uMaskSize = glGetUniformLocation(postProccesProgram, "maskSize");
-	uTime = glGetUniformLocation(postProccesProgram, "time");
 	uMaskSelector = glGetUniformLocation(postProccesProgram, "maskSelector");
+	uTime = glGetUniformLocation(postProccesProgram, "time");
+	uUseNoise = glGetUniformLocation(postProccesProgram, "useNoise");
 }
 
 void initObj()
@@ -525,10 +555,12 @@ void renderFunc()
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	/**/
-	glUseProgram(program);
+	///////////
+	//Forward-rendering
+	///////////
+	glUseProgram(forwardProgram);
 
-	//Texturas
+	//Texturas del forward-rendering
 	if (uColorTex != -1)
 	{
 		glActiveTexture(GL_TEXTURE0);
@@ -543,6 +575,7 @@ void renderFunc()
 		glUniform1i(uEmiTex, 1);
 	}
 
+	//Dibujado de los distintos cubos
 	model = glm::mat4(2.0f);
 	model[3].w = 1.0f;
 	model = glm::rotate(model, angle, glm::vec3(1.0f, 1.0f, 0.0f));
@@ -573,83 +606,65 @@ void renderFunc()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	///////////
+	//Post-procesing
+	///////////
 	glUseProgram(postProccesProgram);
 
+	//Variables uniform
+	//Variables de control del DOF
 	if (uFocalDistance != -1)
-	{
 		glUniform1f(uFocalDistance, focalDistance);
-	}
-
 	if (uMaxDistanceFactor != -1)
-	{
 		glUniform1f(uMaxDistanceFactor, 1 / maxDistanceFactor);
-	}
 
+	//Variables para el cálculo de la profundidad
 	if (uNear != -1)
-	{
 		glUniform1f(uNear, projNear);
-	}
-
 	if (uFar != -1)
-	{
 		glUniform1f(uFar, projFar);
-	}
 
-	if (uMaskSize != -1)
-	{
-		if (maskSelector < 4)
-			glUniform1i(uMaskSize, maskSize9);
-		else
-			glUniform1i(uMaskSize, maskSize25);
-	}
-
+	//Variables para las máscaras de convolución
 	if (uMaskSelector != 1)
-	{
 		glUniform1i(uMaskSelector, maskSelector);
-	}
-
 	if (uMask9 != -1)
-	{
-		glUniform1fv(uMask9, maskSize9, mask_9d);
-	}
+		glUniform1fv(uMask9, 9, mask_9d);
+	if (uMask25 != -1)
+		glUniform1fv(uMask25, 25, mask25);
 
 	if (uTexIdx9 != -1)
-	{
-		for (int i = 0; i != maskSize9; ++i)
+		for (int i = 0; i != 9; ++i)
 		{
 			GLint originsLoc = glGetUniformLocation(postProccesProgram, ("texIdx9[" + std::to_string(i) + "]").c_str());
 			glUniform2f(originsLoc, texIdx9[i].x, texIdx9[i].y);
 		}
-	}
-
-	if (uMask25 != -1)
-	{
-		glUniform1fv(uMask25, maskSize25, mask25);
-	}
 
 	if (uTexIdx25 != -1)
-	{
-		for (int i = 0; i != maskSize25; ++i)
+		for (int i = 0; i != 25; ++i)
 		{
 			GLint originsLoc = glGetUniformLocation(postProccesProgram, ("texIdx25[" + std::to_string(i) + "]").c_str());
 			glUniform2f(originsLoc, texIdx25[i].x, texIdx25[i].y);
 		}
-	}
 
+	//Variable para el efecto de post-procesado del noise
 	if (uTime != -1)
-	{
 		glUniform1f(uTime, glutGet(GLUT_ELAPSED_TIME));
-	}
+	if (uUseNoise != -1)
+		glUniform1i(uUseNoise, useNoise);
 
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
 
-	//glEnable(GL_BLEND);
-	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	//glBlendFunc(GL_CONSTANT_COLOR, GL_CONSTANT_ALPHA);
-	//glBlendColor(motionColor, motionColor, motionColor, motionAlpha);
-	//glBlendEquation(GL_FUNC_ADD);
+	if (useBlend)
+	{
+		glEnable(GL_BLEND);
+		//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glBlendFunc(GL_CONSTANT_COLOR, GL_CONSTANT_ALPHA);
+		glBlendColor(motionColor, motionColor, motionColor, motionAlpha);	//Control del motion Blur
+		glBlendEquation(GL_FUNC_ADD);
+	}
 
+	//Establecimiento de los distintos bufferes para el post-procesado
 	glActiveTexture(GL_TEXTURE0 + 0);
 	glBindTexture(GL_TEXTURE_2D, colorBuffTexId);
 
@@ -696,6 +711,7 @@ void renderCube()
 
 void resizeFunc(int width, int height)
 {
+	//Mantenimiento del aspect ratio
 	glViewport(0, 0, width, height);
 	proj = glm::perspective(glm::radians(60.0f), float(width) / float(height), projNear, projFar);
 
@@ -715,6 +731,9 @@ void keyboardFunc(unsigned char key, int x, int y)
 {
 	switch (key)
 	{
+	//OBLIGATORIO 1
+	//CONTROL DEL MOTION BLUR POR TECLADO
+	//Alfa controlado con 1,2 y Color controlado con 3,4
 	case('1'):
 		motionAlpha = std::min(1.0f, motionAlpha + 0.01f);
 		break;
@@ -727,6 +746,10 @@ void keyboardFunc(unsigned char key, int x, int y)
 	case('4'):
 		motionColor = std::max(0.0f, motionColor - 0.01f);
 		break;
+
+	//OBLIGATORIO 2
+	//CONTROL DE LOS PARÁMETROS DEL DOF POR TECLADO
+	//Distancia focal controlada con 5,6 y Factor máximo de distancia con 7,8
 	case('5'):
 		focalDistance = std::max(-100.0f, focalDistance - 0.25f);
 		break;
@@ -739,27 +762,44 @@ void keyboardFunc(unsigned char key, int x, int y)
 	case('8'):
 		maxDistanceFactor = std::max(0.1f, maxDistanceFactor - 0.1f);
 		break;
+
+	//OBLIGATORIO 4
+	//USO DE VARIAS MÁSCARAS DE CONVOLUCIÓN Y SU SELECCIÓN POR TECLADO
 	case('9'):
-		maskSelector = (maskSelector < 4) ? maskSelector + 1 : 0;
+		maskSelector = (maskSelector < 5) ? maskSelector + 1 : 0;
 		switch (maskSelector)
 		{
 		case(0):
-			for (int i = 0; i < maskSize9; ++i)
-				mask_9d[i] = mask1[i];
+			for (int i = 0; i < 9; ++i)
+				mask_9d[i] = defaultMask[i];
 			break;
 		case(1):
-			for (int i = 0; i < maskSize9; ++i)
+			for (int i = 0; i < 9; ++i)
 				mask_9d[i] = laplacianEdgeFilterMask[i];
 			break;
 		case(2):
-			for (int i = 0; i < maskSize9; ++i)
+			for (int i = 0; i < 9; ++i)
 				mask_9d[i] = northDirectionMask[i];
 			break;
 		case(3):
-			for (int i = 0; i < maskSize9; ++i)
+			for (int i = 0; i < 9; ++i)
 				mask_9d[i] = embossFilterMask[i];
 			break;
 		}
+		break;
+
+	//OPCIONAL 2
+	//CONCATENACIÓN DE DISTINTOS POSTPROCESOS
+	//Control para usar o no usar el Motion Blur
+	case('Q'):
+	case('q'):
+		useBlend = !useBlend;
+		break;
+
+	//Control para usar o no el Noise
+	case('W'):
+	case('w'):
+		useNoise = !useNoise;
 		break;
 	}
 }
@@ -779,6 +819,7 @@ void initFBO()
 
 void resizeFBO(unsigned int w, unsigned int h)
 {
+	//Inicialización de todos los buffers del post-procesado
 	glBindTexture(GL_TEXTURE_2D, colorBuffTexId);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -815,7 +856,7 @@ void resizeFBO(unsigned int w, unsigned int h)
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, normalBuffTexId, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, emiBuffTexId, 0);
 
-	const GLenum buffs[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
+	const GLenum buffs[4] = { GL_COLOR_ATTACHMENT0,  GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
 	glDrawBuffers(4, buffs);
 
 	if (GL_FRAMEBUFFER_COMPLETE != glCheckFramebufferStatus(GL_FRAMEBUFFER))
